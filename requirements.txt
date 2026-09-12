@@ -1,0 +1,13 @@
+numpy>=2.0
+pandas>=2.2
+Pillow>=11.0
+scikit-learn>=1.6
+scipy>=1.13
+opencv-python>=4.8
+umap-learn>=0.5
+matplotlib>=3.8          # examples and the notebook only
+requests>=2.31           # fetch_example.py: range reads over HTTP
+pyarrow>=15.0            # fetch_example.py: the cartoon example's parquet
+
+# To run notebooks/walkthrough.ipynb:
+#   pip install ipykernel jupyterlab
