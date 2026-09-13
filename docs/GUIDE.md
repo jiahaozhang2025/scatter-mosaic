@@ -2,7 +2,7 @@
 
 Everything the [README](../README.md) leaves out.
 
-- [Two choices](#two-choices)
+- [Three independent choices](#three-independent-choices)
 - [Where each image goes](#where-each-image-goes)
 - [Controls in the page](#controls-in-the-page)
 - [Colours](#colours)
@@ -14,10 +14,11 @@ Everything the [README](../README.md) leaves out.
 - [Known limits](#known-limits)
 - [Credits](#credits)
 
-## Two choices
+## Three independent choices
 
 |  |  |
 |---|---|
+| **Layout** | `--layout umap` (default), `tsne` or `pca` turns features into two dimensions. `cities` skips it: those coordinates are longitude and latitude. Nothing downstream can tell the difference — the painter only ever sees two columns of numbers, which is why a PCA cloud with no clusters at all works as well as a UMAP with ten. |
 | **Placement** | `scatter` (default) packs equal squares onto the parts of the cloud that can support them, then gives each point to its nearest image. No clustering involved, and every image gets a home. `cluster` fits one image to each group's silhouette instead — good when your points already carry a label. |
 | **Style** | `paint` (default) colours every point's own dot from the image, so the picture is made of data and nothing is hidden. `overlay` lays the image over the dots. |
 
@@ -152,6 +153,15 @@ Points (`--dataset`):
 | `lfw` | 13,233 photographs of 5,749 people | ~200 MB. Fair warning: a UMAP of raw pixels separates pose and lighting, not identity, so the map is close to one blob. |
 | `digits` | 1,797 digits, 8×8 | Bundled with scikit-learn, no download. |
 | `olivetti` | 400 faces, 40 people | ~4.5 MB. |
+| `cities` | ~34,000 cities over 15,000 people | ~3 MB from GeoNames. Not an embedding: longitude and latitude, `--layout` ignored. Wants `--face-size 0.13 --face-fill 0.45`, because continents are ragged. |
+
+Layouts (`--layout`), for the datasets that need one:
+
+| | |
+|---|---|
+| `umap` | The default. Tight islands with wisps and bridges between them. |
+| `tsne` | Rounder, more evenly sized blobs, packed closer together. Much slower — budget minutes, and consider `--limit 25000`. |
+| `pca` | One continuous cloud, no clusters whatsoever. Worth trying precisely because it has no structure to lean on: the images tile edge to edge across the densest part and it still reads. |
 
 Pictures (`--images-from`) are listed in the [README](../README.md). All four choose
 their tiles by average colour, so no two look alike from across the room.
@@ -216,7 +226,8 @@ Everything is fetched at run time and none of it is redistributed here.
 
 **Points.** MNIST, Fashion-MNIST and Kuzushiji-MNIST via OpenML; scikit-learn's
 digits and the Olivetti/AT&T face database; Labeled Faces in the Wild; Google's
-Cartoon Set (CC BY 4.0), read through the `cgarciae/cartoonset` mirror.
+Cartoon Set (CC BY 4.0), read through the `cgarciae/cartoonset` mirror; the
+`cities15000` gazetteer from GeoNames (CC BY 4.0).
 
 **Pictures.** OpenMoji (CC BY-SA 4.0). SFHQ, which is generated rather than
 photographed. The anime portraits come from the `HK83/Anime_Faces` mirror of the

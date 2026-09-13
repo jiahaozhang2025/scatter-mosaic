@@ -27,13 +27,19 @@ python scripts/build_poster.py --regions   examples/mnist-emoji/mosaic/regions.c
 Open `examples/mnist-emoji/mosaic/mosaic.html`. `fetch_example.py` always ends by
 printing the build command that suits the map it just made.
 
-## The points and the pictures are separate
+## Nothing here is about UMAP
 
-`--dataset` says where the points come from, `--images-from` where the pictures do.
-They have nothing to do with each other, and that is the normal case: you have data,
+Nothing downstream of the fetch script knows how the coordinates were made. It is a
+2-D scatter painter: `--dataset` says where the points come from, `--layout` how they
+were flattened, and `--images-from` where the pictures come from. All three are
+independent, and the last one is unrelated to your data by design — you have data,
 and you have pictures you want the data to be made of.
 
-![Four mosaics: MNIST with emoji, Fashion-MNIST with AI-generated faces, Kuzushiji-MNIST with cartoon avatars, and a Cartoon Set attribute embedding with anime portraits](docs/pictures.jpg)
+![Four mosaics on four different kinds of scatter: a UMAP of MNIST with emoji, a t-SNE of Fashion-MNIST with AI-generated faces, a PCA of Kuzushiji-MNIST with anime portraits, and world cities plotted by longitude and latitude with cartoon avatars](docs/pictures.jpg)
+
+Bottom row is the point: those are cities at their real longitude and latitude. No
+projection, no clusters, no algorithm — and the placement rules do not change. Europe
+and India are dense enough to hold an image; the Pacific is not.
 
 | `--images-from` | | |
 |---|---|---|
@@ -42,9 +48,9 @@ and you have pictures you want the data to be made of.
 | `cartoon` | Avatars from Google's Cartoon Set | Ships its own alpha. |
 | `anime` | Anime portraits | No alpha to be had, and GrabCut takes the face and throws the hair away, so these are feathered instead. |
 
-`--dataset` takes `mnist`, `fashion`, `kmnist`, `cartoon`, `lfw`, `digits` and
-`olivetti`. Leave `--images-from` off and each dataset illustrates itself, one image
-per class.
+`--dataset` takes `mnist`, `fashion`, `kmnist`, `cartoon`, `lfw`, `digits`,
+`olivetti` and `cities`; `--layout` takes `umap` (default), `tsne` and `pca`. Leave
+`--images-from` off and each dataset illustrates itself, one image per class.
 
 ## Your own data
 
@@ -57,6 +63,7 @@ cell-0,3.71,-8.20,neuron,0.94
 
 Coordinates are guessed from the usual names (`x`/`y`, `UMAP1`/`UMAP2`, `tsne_1`,
 `PC1`, …); any other column is carried through and shown when you click a point.
+Nothing checks, or cares, whether an algorithm produced them.
 Pictures come from a folder, one per region, matched through an `image_map.csv`
 you can edit and rebuild from.
 

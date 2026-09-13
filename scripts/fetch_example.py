@@ -1,6 +1,10 @@
 """Build a runnable example from a public dataset: an embedding plus its tile images.
 
-Where the points come from (`--dataset`):
+Where the points come from (`--dataset`), and how they are laid out (`--layout`):
+
+Nothing downstream of this script knows or cares how the coordinates were made. It
+is a 2-D scatter painter, so `--layout` picks between UMAP, t-SNE and plain PCA, and
+`cities` skips the question entirely by arriving with real coordinates already.
 
   mnist    70,000 handwritten digits, 28x28 — ~15 MB from OpenML. The default, and
            the best-looking map of the lot: long curved islands, wisps, and bridges
@@ -18,6 +22,10 @@ Where the points come from (`--dataset`):
            that a UMAP of raw pixels barely separates people at all.
   digits   1,797 points, 10 digits, 8x8 — bundled with scikit-learn, no download.
   olivetti 400 points, 40 people, 64x64 — ~4.5 MB, the AT&T face database.
+  cities   ~25,000 cities of over 15,000 people — ~3 MB from GeoNames. Not an
+           embedding at all: the coordinates are longitude and latitude. Europe,
+           India, China and the US eastern seaboard are the dense islands, and the
+           oceans are the gaps between them.
 
 Where the pictures come from (`--images-from`, optional):
 
@@ -78,6 +86,7 @@ GARMENT_NAMES = ["t-shirt", "trouser", "pullover", "dress", "coat",
 KUZUSHIJI_NAMES = ["o", "ki", "su", "tsu", "na", "ha", "ma", "ya", "re", "wo"]
 LFW_HOME = Path.home() / "scikit_learn_data" / "lfw_home" / "lfw_funneled"
 
+GEONAMES_CITIES = "https://download.geonames.org/export/dump/cities15000.zip"
 CARTOON_PARQUET = ("https://huggingface.co/api/datasets/cgarciae/cartoonset"
                    "/parquet/100k+features/train/{part}.parquet")
 CARTOON_PARTS = 10
@@ -119,6 +128,9 @@ class Source:
     # Given row indices, hand back the pictures. Used when there are no classes.
     pictures: Callable[[list[int]], dict[int, Image.Image]] | None = None
     notes: list[str] = field(default_factory=list)
+    # Set when the data already has coordinates and no layout step is wanted.
+    # Kept last: every other caller passes positionally.
+    coords: np.ndarray | None = None
 
 
 def arguments() -> argparse.Namespace:
@@ -127,8 +139,11 @@ def arguments() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p.add_argument("--dataset", choices=("mnist", "fashion", "kmnist", "cartoon", "lfw",
-                                         "digits", "olivetti"),
+                                         "digits", "olivetti", "cities"),
                    default="mnist", help="Where the points come from.")
+    p.add_argument("--layout", choices=("umap", "tsne", "pca"), default="umap",
+                   help="How to get from features to two dimensions. Ignored by datasets "
+                        "that arrive with coordinates of their own.")
     p.add_argument("--images-from", choices=("faces", "anime", "emoji", "cartoon"), default=None,
                    help="Take the tile pictures from here instead of from the dataset's "
                         "own classes. The points and the pictures are unrelated, which is "
@@ -329,7 +344,50 @@ PICTURES = {
 }
 
 
+def cities(limit: int) -> Source:
+    """Cities of over 15,000 people, at their real longitude and latitude.
+
+    The point of this one is that no algorithm made the coordinates. It is the same
+    painter working on a scatter that happens to be a world map, and it exercises
+    exactly the same placement rules: Europe and India are dense enough to hold an
+    image, the Pacific is not.
+    """
+    import io as _io
+    import zipfile
+
+    from umap_mosaic.remote import session
+
+    print("Fetching GeoNames cities15000 (~3 MB)...")
+    answer = session().get(GEONAMES_CITIES, timeout=180)
+    answer.raise_for_status()
+    with zipfile.ZipFile(_io.BytesIO(answer.content)) as bundle:
+        with bundle.open("cities15000.txt") as handle:
+            frame = pd.read_csv(handle, sep="\t", header=None, dtype=str,
+                                usecols=[1, 4, 5, 8, 14],
+                                names=["name", "lat", "lon", "country", "population"])
+
+    frame = frame.dropna(subset=["lat", "lon"])
+    lat = frame["lat"].astype(float).to_numpy()
+    lon = frame["lon"].astype(float).to_numpy()
+    if limit and limit < len(frame):
+        frame, lat, lon = frame.iloc[:limit], lat[:limit], lon[:limit]
+    print(f"  {len(frame):,} cities")
+
+    # Latitude grows north and the layout's y grows downward, so negate it or the
+    # world arrives upside down.
+    coords = np.column_stack([lon, -lat])
+    extras = pd.DataFrame({
+        "city": frame["name"].to_numpy(),
+        "country": frame["country"].to_numpy(),
+        "population": pd.to_numeric(frame["population"], errors="coerce").fillna(0).astype(int),
+    })
+    return Source(vectors=coords, group="place", mode="photo", coords=coords, extras=extras)
+
+
 def gather(name: str, limit: int, seed: int, pool: int) -> Source:
+    if name == "cities":
+        return cities(limit)
+
     if name == "cartoon":
         return cartoon(limit, pool)
 
@@ -560,9 +618,29 @@ def write_tiles(source: Source, coords: np.ndarray, images_dir: Path, args: argp
     return len(list(images_dir.glob("*.png")))
 
 
+def lay_out(vectors: np.ndarray, args: argparse.Namespace) -> np.ndarray:
+    """Features to two dimensions, by whichever method was asked for."""
+    if args.layout == "pca":
+        print("Taking the first two principal components...")
+        return PCA(n_components=2, random_state=args.seed).fit_transform(vectors)
+
+    if args.layout == "tsne":
+        from sklearn.manifold import TSNE
+
+        print(f"Running t-SNE (perplexity={args.neighbors * 2})... this is the slow one.")
+        return TSNE(n_components=2, perplexity=args.neighbors * 2, init="pca",
+                    random_state=args.seed, verbose=0).fit_transform(vectors)
+
+    print(f"Running UMAP (n_neighbors={args.neighbors}, min_dist={args.min_dist})...")
+    return UMAP(n_components=2, n_neighbors=args.neighbors, min_dist=args.min_dist,
+                random_state=args.seed, verbose=False).fit_transform(vectors)
+
+
 def main() -> None:
     args = arguments()
     name = f"{args.dataset}-{args.images_from}" if args.images_from else args.dataset
+    if args.layout != "umap" and args.dataset != "cities":
+        name = f"{args.layout}-{name}"
     out = args.out or ROOT / "examples" / name
     images_dir = out / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
@@ -572,21 +650,20 @@ def main() -> None:
     classes = "unlabelled" if source.labels is None else f"{len(set(source.labels))} classes"
     print(f"{len(vectors):,} points, {classes}, {vectors.shape[1]} features")
 
-    # PCA first on wide inputs: standard practice, and it turns a multi-minute
-    # UMAP on raw pixels into well under one.
-    if vectors.shape[1] > 60:
-        components = min(50, vectors.shape[1], len(vectors) - 1)
-        print(f"PCA {vectors.shape[1]} -> {components} dimensions...")
-        vectors = PCA(n_components=components, random_state=args.seed).fit_transform(vectors)
+    if source.coords is not None:
+        coords = source.coords
+        print(f"Coordinates come with the data; no {args.layout} step.")
     else:
-        # Attribute tables come in arbitrary units; without this the widest column wins.
-        vectors = (vectors - vectors.mean(0)) / (vectors.std(0) + 1e-9)
-
-    print(f"Running UMAP (n_neighbors={args.neighbors}, min_dist={args.min_dist})...")
-    coords = UMAP(
-        n_components=2, n_neighbors=args.neighbors, min_dist=args.min_dist,
-        random_state=args.seed, verbose=False,
-    ).fit_transform(vectors)
+        # PCA first on wide inputs: standard practice, and it turns a multi-minute
+        # layout on raw pixels into well under one.
+        if vectors.shape[1] > 60:
+            components = min(50, vectors.shape[1], len(vectors) - 1)
+            print(f"PCA {vectors.shape[1]} -> {components} dimensions...")
+            vectors = PCA(n_components=components, random_state=args.seed).fit_transform(vectors)
+        else:
+            # Attribute tables come in arbitrary units; else the widest column wins.
+            vectors = (vectors - vectors.mean(0)) / (vectors.std(0) + 1e-9)
+        coords = lay_out(vectors, args)
 
     frame = pd.DataFrame({
         "id": [f"{args.dataset}-{i}" for i in range(len(coords))],
