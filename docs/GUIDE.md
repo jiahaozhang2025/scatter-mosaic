@@ -154,7 +154,7 @@ Points (`--dataset`):
 | `lfw` | 13,233 photographs of 5,749 people | ~200 MB. Fair warning: a UMAP of raw pixels separates pose and lighting, not identity, so the map is close to one blob. |
 | `digits` | 1,797 digits, 8×8 | Bundled with scikit-learn, no download. |
 | `olivetti` | 400 faces, 40 people | ~4.5 MB. |
-| `cities` | ~70,000 cities over 5,000 people | ~5 MB from GeoNames. Longitude and latitude, `--layout` ignored. Coastlines are ragged and thin, so this one wants many small pictures on plenty of points: `--densify 5 --tiles 30 --face-size 0.055 --face-fill 0.40`. |
+| `cities` | ~70,000 cities over 5,000 people | ~5 MB from GeoNames. Longitude and latitude, `--layout` ignored. Coastlines are thin and ragged, so this one wants *many small* pictures on *many* points: `--densify 5 --tiles 60 --face-size 0.030 --face-fill 0.35`. Fewer, larger pictures have nowhere on a coastline to sit. |
 | `stars` | ~100,000 stars as an HR diagram | ~32 MB from the HYG catalogue. Colour index against absolute magnitude, both axes standardized because they are in unrelated units. One broad diagonal band — the main sequence — with the giant branch as a spur off the top. Wants `--limit 40000 --densify 2 --face-size 0.20 --face-fill 0.72`. |
 | `quakes` | ~25,000 earthquakes of M2.5+ over a year | ~4 MB from USGS, paged because one query is capped at 20,000. A beautiful map and a poor mosaic — see below. |
 
@@ -231,6 +231,9 @@ field is left blank for them, and nothing should be measured from them. The coun
 the page header includes them, so say so if you publish the number.
 
 ## Known limits
+
+**Above 24 regions the poster stops naming them** and the legend becomes a strip of
+numbered thumbnails, because two rows of labelled text is all that fits.
 
 **Point count sets the page size**, at roughly 65 bytes a point in the HTML: 40,000
 points make a 1.8 MB page and 350,000 make a 20 MB one. The poster does not care.

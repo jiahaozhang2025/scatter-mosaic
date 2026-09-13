@@ -389,15 +389,27 @@ def main() -> None:
             blend = Image.fromarray(np.clip(shape_alpha * photo_alpha * 255, 0, 255).astype(np.uint8))
             background.paste(face_rgb, (px0, py0), blend)
 
-    # Compact two-row legend: portrait, number, name, role, and cell count.
+    # Legend: portrait, number, name, role and point count — until there are too
+    # many regions for that to fit, at which point the names are dropped and it
+    # becomes a numbered contact strip. Two fixed rows used to be assumed here,
+    # and anything past the twenty-fourth region was drawn off the bottom edge.
     # Every measurement scales with the canvas so --width/--height stay usable.
     draw = ImageDraw.Draw(background)
     legend_top = height - legend_h + int(height*.025)
-    rows = 2
-    columns = max(1, min(12, math.ceil(n_clusters / rows)))
-    cell_w = (width - 2*margin_x) / columns
-    cell_h = (legend_h - int(height*.045)) / rows
-    thumb_px = max(24, int(height * .0228))
+    band_w, band_h = width - 2*margin_x, legend_h - int(height*.045)
+    named = n_clusters <= 24
+    if named:
+        rows = 2
+        columns = max(1, math.ceil(n_clusters / rows))
+    else:
+        # Squarish grid, then relax until each row is tall enough to see.
+        rows = max(1, round(math.sqrt(n_clusters * band_h / band_w)))
+        while rows > 1 and band_h / rows < height * .028:
+            rows -= 1
+        columns = math.ceil(n_clusters / rows)
+    cell_w, cell_h = band_w / columns, band_h / rows
+    thumb_px = (max(24, int(height * .0228)) if named
+                else max(16, int(min(cell_h * .82, cell_w * .82))))
     text_x = thumb_px + max(6, thumb_px // 7)
     name_font = font(max(11, int(height*.0068)), bold=True)
     detail_font = font(max(10, int(height*.0056)))
@@ -412,6 +424,8 @@ def main() -> None:
         ImageDraw.Draw(thumb_mask).ellipse((2, 2, thumb_px-2, thumb_px-2), fill=255)
         background.paste(thumb, (x0, y0), thumb_mask)
         draw.ellipse((x0+1, y0+1, x0+thumb_px-1, y0+thumb_px-1), outline=color_for(cluster), width=max(2, thumb_px//16))
+        if not named:
+            continue
         count = int((clusters == cluster).sum())
         detail = f"{roles[cluster]} · {count:,} points" if roles[cluster] else f"{count:,} points"
         draw.text((x0+text_x, y0+int(thumb_px*.14)),

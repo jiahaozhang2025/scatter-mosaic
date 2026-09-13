@@ -22,10 +22,11 @@ is a 2-D scatter painter, so `--layout` picks between UMAP, t-SNE and plain PCA,
            that a UMAP of raw pixels barely separates people at all.
   digits   1,797 points, 10 digits, 8x8 — bundled with scikit-learn, no download.
   olivetti 400 points, 40 people, 64x64 — ~4.5 MB, the AT&T face database.
-  cities   ~34,000 cities of over 15,000 people — ~3 MB from GeoNames. Not an
-           embedding at all: the coordinates are longitude and latitude. Europe,
-           India, China and the US eastern seaboard are the dense islands, and the
-           oceans are the gaps between them.
+  cities   ~70,000 cities of over 5,000 people — ~5 MB from GeoNames. Not an
+           embedding at all: the coordinates are longitude and latitude. Coastlines
+           are thin and ragged, so this one wants sixty small pictures on a cloud
+           that has been densified about fivefold; a handful of big ones cannot sit
+           on a continent's edge. Try --densify 5 --images-from emoji.
   quakes   ~25,000 earthquakes of M2.5+ over a year — ~4 MB from USGS, paged
            because the API caps a query at 20,000. Plate boundaries, which is to
            say long thin arcs: the closest a real scatter gets to the wisps UMAP
@@ -126,6 +127,9 @@ TUNING = {
     "fashion": {"build": ["--face-size", "0.14"]},
     "mnist": {"build": ["--face-size", "0.14", "--face-fill", "0.72"]},
     "kmnist": {"build": ["--face-size", "0.14", "--face-fill", "0.72"]},
+    # Coastlines are thin and ragged: many small pictures beat a few big ones,
+    # and they only read at all on a densified cloud (--densify 5).
+    "cities": {"tiles": 60, "build": ["--face-size", "0.030", "--face-fill", "0.35"]},
 }
 
 
