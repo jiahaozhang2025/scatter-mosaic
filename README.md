@@ -35,11 +35,24 @@ were flattened, and `--images-from` where the pictures come from. All three are
 independent, and the last one is unrelated to your data by design — you have data,
 and you have pictures you want the data to be made of.
 
-![Four mosaics on four different kinds of scatter: a UMAP of MNIST with emoji, a t-SNE of Fashion-MNIST with AI-generated faces, a PCA of Kuzushiji-MNIST with anime portraits, and world cities plotted by longitude and latitude with cartoon avatars](docs/pictures.jpg)
+![Four mosaics on four different kinds of scatter: a UMAP of MNIST with emoji, a t-SNE of Fashion-MNIST with AI-generated faces, a Hertzsprung-Russell diagram of 40,000 stars with anime portraits, and world cities plotted by longitude and latitude with cartoon avatars](docs/pictures.jpg)
 
-Bottom row is the point: those are cities at their real longitude and latitude. No
-projection, no clusters, no algorithm — and the placement rules do not change. Europe
-and India are dense enough to hold an image; the Pacific is not.
+Two of those are not projections of anything. The stars are a Hertzsprung–Russell
+diagram — colour against brightness, the oldest scatter plot in astronomy. The
+bottom row is cities at their real longitude and latitude. No algorithm, no
+clusters, and the placement rules do not change: Europe and India are dense enough
+to hold an image, the Pacific is not.
+
+### Thin data: `--densify`
+
+Real scatters are often too sparse to paint with. `--densify 3` simulates two extra
+points near every real one — sampled from the scatter's own shape, with the jitter
+scaled by each point's distance to its own sixth neighbour, so dense ground stays
+tight and the outline holds. The world map above is unreadable without it and
+legible with it.
+
+The added points are **not data**. They are flagged in a `simulated` column, left
+blank in every other field, and nothing should be measured from them.
 
 | `--images-from` | | |
 |---|---|---|
@@ -49,8 +62,9 @@ and India are dense enough to hold an image; the Pacific is not.
 | `anime` | Anime portraits | No alpha to be had, and GrabCut takes the face and throws the hair away, so these are feathered instead. |
 
 `--dataset` takes `mnist`, `fashion`, `kmnist`, `cartoon`, `lfw`, `digits`,
-`olivetti` and `cities`; `--layout` takes `umap` (default), `tsne` and `pca`. Leave
-`--images-from` off and each dataset illustrates itself, one image per class.
+`olivetti`, and the three that need no layout at all — `cities`, `stars` and
+`quakes`. `--layout` takes `umap` (default), `tsne` and `pca`. Leave `--images-from`
+off and each dataset illustrates itself, one image per class.
 
 ## Your own data
 

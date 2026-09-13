@@ -22,10 +22,18 @@ is a 2-D scatter painter, so `--layout` picks between UMAP, t-SNE and plain PCA,
            that a UMAP of raw pixels barely separates people at all.
   digits   1,797 points, 10 digits, 8x8 — bundled with scikit-learn, no download.
   olivetti 400 points, 40 people, 64x64 — ~4.5 MB, the AT&T face database.
-  cities   ~25,000 cities of over 15,000 people — ~3 MB from GeoNames. Not an
+  cities   ~34,000 cities of over 15,000 people — ~3 MB from GeoNames. Not an
            embedding at all: the coordinates are longitude and latitude. Europe,
            India, China and the US eastern seaboard are the dense islands, and the
            oceans are the gaps between them.
+  quakes   ~25,000 earthquakes of M2.5+ over a year — ~4 MB from USGS, paged
+           because the API caps a query at 20,000. Plate boundaries, which is to
+           say long thin arcs: the closest a real scatter gets to the wisps UMAP
+           makes, and the best argument for --densify.
+  stars    ~100,000 stars as a Hertzsprung-Russell diagram — ~32 MB from the HYG
+           catalogue. Colour index against absolute magnitude, the two axes
+           standardized because they are in unrelated units. The main sequence is
+           the diagonal band, the giants the clump above it.
 
 Where the pictures come from (`--images-from`, optional):
 
@@ -77,6 +85,7 @@ import sys  # noqa: E402
 sys.path.insert(0, str(ROOT))
 
 from umap_mosaic.cutout import apply_cutout, cut_out, pad_to_frame  # noqa: E402
+from umap_mosaic.density import densify  # noqa: E402
 from umap_mosaic.remote import RemoteFile  # noqa: E402
 
 DIGIT_NAMES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
@@ -87,6 +96,12 @@ KUZUSHIJI_NAMES = ["o", "ki", "su", "tsu", "na", "ha", "ma", "ya", "re", "wo"]
 LFW_HOME = Path.home() / "scikit_learn_data" / "lfw_home" / "lfw_funneled"
 
 GEONAMES_CITIES = "https://download.geonames.org/export/dump/cities15000.zip"
+USGS_QUERY = ("https://earthquake.usgs.gov/fdsnws/event/1/query?format=csv"
+              "&starttime={start}&endtime={end}&minmagnitude=2.5&orderby=time")
+# One query may return at most 20,000 events, so a year has to be asked for in parts.
+USGS_WINDOWS = (("2024-01-01", "2024-05-01"), ("2024-05-01", "2024-09-01"),
+                ("2024-09-01", "2025-01-01"))
+HYG_STARS = "https://raw.githubusercontent.com/astronexus/HYG-Database/main/hyg/CURRENT/hygdata_v41.csv"
 CARTOON_PARQUET = ("https://huggingface.co/api/datasets/cgarciae/cartoonset"
                    "/parquet/100k+features/train/{part}.parquet")
 CARTOON_PARTS = 10
@@ -139,7 +154,7 @@ def arguments() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p.add_argument("--dataset", choices=("mnist", "fashion", "kmnist", "cartoon", "lfw",
-                                         "digits", "olivetti", "cities"),
+                                         "digits", "olivetti", "cities", "quakes", "stars"),
                    default="mnist", help="Where the points come from.")
     p.add_argument("--layout", choices=("umap", "tsne", "pca"), default="umap",
                    help="How to get from features to two dimensions. Ignored by datasets "
@@ -157,6 +172,11 @@ def arguments() -> argparse.Namespace:
     p.add_argument("--tiles", type=int, default=None,
                    help="How many images to write. With classes, the best-represented ones; "
                         "without, one per region of the map. Defaults to what suits the dataset.")
+    p.add_argument("--densify", type=float, default=1.0,
+                   help="Simulate extra points from the scatter's own shape until there "
+                        "are this many times as many. For thin data that cannot carry a "
+                        "picture otherwise. The added points are flagged in the CSV and "
+                        "are not data.")
     p.add_argument("--tile-pool", type=int, default=400,
                    help="Candidate pictures to choose the tiles from. Each hundred is one "
                         "more range request.")
@@ -384,9 +404,87 @@ def cities(limit: int) -> Source:
     return Source(vectors=coords, group="place", mode="photo", coords=coords, extras=extras)
 
 
+def quakes(limit: int) -> Source:
+    """A year of magnitude 2.5+ earthquakes, at longitude and latitude.
+
+    Plate boundaries are the thinnest interesting scatter I could find: arcs one
+    or two points wide over most of their length, with genuine clumps off Japan,
+    Indonesia, Chile and Alaska. Without `--densify` there is barely anything to
+    paint with, which is exactly why it is here.
+    """
+    import io as _io
+
+    from umap_mosaic.remote import session
+
+    connection = session()
+    parts = []
+    print("Fetching a year of M2.5+ earthquakes from USGS, in three parts...")
+    for start, end in USGS_WINDOWS:
+        answer = connection.get(USGS_QUERY.format(start=start, end=end), timeout=300)
+        answer.raise_for_status()
+        parts.append(pd.read_csv(_io.StringIO(answer.text),
+                                 usecols=["latitude", "longitude", "depth", "mag", "place"]))
+        print(f"  {start} to {end}: {len(parts[-1]):,}")
+    frame = pd.concat(parts, ignore_index=True).dropna(subset=["latitude", "longitude"])
+    if limit and limit < len(frame):
+        frame = frame.iloc[:limit]
+    print(f"  {len(frame):,} events")
+
+    coords = np.column_stack([frame["longitude"].to_numpy(), -frame["latitude"].to_numpy()])
+    extras = pd.DataFrame({
+        "place": frame["place"].astype(str).to_numpy(),
+        "magnitude": frame["mag"].to_numpy(),
+        "depth_km": frame["depth"].to_numpy(),
+    })
+    return Source(vectors=coords, group="quake", mode="photo", coords=coords, extras=extras)
+
+
+def stars(limit: int) -> Source:
+    """The Hertzsprung-Russell diagram: colour index against absolute magnitude.
+
+    The most famous scatter plot in astronomy, and not a projection of anything —
+    just two measured quantities. Its axes are in unrelated units, so neither the
+    aspect ratio nor the distances mean anything until both are standardized;
+    doing that is what turns a thin vertical smear into the familiar diagonal.
+    """
+    import io as _io
+
+    from umap_mosaic.remote import session
+
+    print("Fetching the HYG star catalogue (~32 MB)...")
+    answer = session().get(HYG_STARS, timeout=900)
+    answer.raise_for_status()
+    frame = pd.read_csv(_io.StringIO(answer.text), low_memory=False,
+                        usecols=["proper", "ci", "absmag", "dist", "spect"])
+    frame = frame.dropna(subset=["ci", "absmag"])
+    # Trim the handful of extreme outliers that would otherwise set the whole scale.
+    frame = frame[frame["ci"].between(-0.5, 2.5) & frame["absmag"].between(-8, 17)]
+    if limit and limit < len(frame):
+        frame = frame.iloc[:limit]
+    print(f"  {len(frame):,} stars")
+
+    colour = frame["ci"].to_numpy(dtype=float)
+    magnitude = frame["absmag"].to_numpy(dtype=float)
+    coords = np.column_stack([
+        (colour - colour.mean()) / colour.std(),
+        (magnitude - magnitude.mean()) / magnitude.std(),
+    ])
+    extras = pd.DataFrame({
+        "star": frame["proper"].fillna("").astype(str).to_numpy(),
+        "spectral_type": frame["spect"].fillna("").astype(str).to_numpy(),
+        "colour_index": np.round(colour, 3),
+        "abs_magnitude": np.round(magnitude, 3),
+    })
+    return Source(vectors=coords, group="star", mode="photo", coords=coords, extras=extras)
+
+
 def gather(name: str, limit: int, seed: int, pool: int) -> Source:
     if name == "cities":
         return cities(limit)
+    if name == "quakes":
+        return quakes(limit)
+    if name == "stars":
+        return stars(limit)
 
     if name == "cartoon":
         return cartoon(limit, pool)
@@ -665,15 +763,29 @@ def main() -> None:
             vectors = (vectors - vectors.mean(0)) / (vectors.std(0) + 1e-9)
         coords = lay_out(vectors, args)
 
+    simulated = np.zeros(len(coords), dtype=bool)
+    if args.densify > 1:
+        before = len(coords)
+        cx, cy, simulated = densify(coords[:, 0], coords[:, 1], args.densify, seed=args.seed)
+        coords = np.column_stack([cx, cy])
+        print(f"Densified {before:,} -> {len(coords):,} points "
+              f"({simulated.sum():,} simulated from the scatter's own shape, not data)")
+
     frame = pd.DataFrame({
         "id": [f"{args.dataset}-{i}" for i in range(len(coords))],
         "x": np.round(coords[:, 0], 5),
         "y": np.round(coords[:, 1], 5),
     })
+    # A simulated point has no attributes of its own, and inventing some would be
+    # a lie in a column somebody might read. Reindexing leaves those rows blank.
     if source.labels is not None and source.names is not None:
-        frame["label"] = [source.names[int(v)] for v in source.labels]
+        named = pd.Series([source.names[int(v)] for v in source.labels])
+        frame["label"] = named.reindex(range(len(frame))).to_numpy()
     if source.extras is not None:
-        frame = pd.concat([frame, source.extras.iloc[:len(frame)]], axis=1)
+        extras = source.extras.reset_index(drop=True).reindex(range(len(frame)))
+        frame = pd.concat([frame, extras], axis=1)
+    if simulated.any():
+        frame["simulated"] = simulated
     frame.to_csv(out / "embedding.csv", index=False)
 
     written = write_tiles(source, coords, images_dir, args)

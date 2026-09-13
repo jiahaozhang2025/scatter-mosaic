@@ -11,6 +11,7 @@ Everything the [README](../README.md) leaves out.
 - [The examples](#the-examples)
 - [Project layout](#project-layout)
 - [Optional: compacting the layout](#optional-compacting-the-layout)
+- [Making thin data paintable](#making-thin-data-paintable)
 - [Known limits](#known-limits)
 - [Credits](#credits)
 
@@ -153,7 +154,9 @@ Points (`--dataset`):
 | `lfw` | 13,233 photographs of 5,749 people | ~200 MB. Fair warning: a UMAP of raw pixels separates pose and lighting, not identity, so the map is close to one blob. |
 | `digits` | 1,797 digits, 8×8 | Bundled with scikit-learn, no download. |
 | `olivetti` | 400 faces, 40 people | ~4.5 MB. |
-| `cities` | ~34,000 cities over 15,000 people | ~3 MB from GeoNames. Not an embedding: longitude and latitude, `--layout` ignored. Wants `--face-size 0.13 --face-fill 0.45`, because continents are ragged. |
+| `cities` | ~34,000 cities over 15,000 people | ~3 MB from GeoNames. Not an embedding: longitude and latitude, `--layout` ignored. Wants `--densify 3 --face-size 0.13 --face-fill 0.45`, because continents are ragged and thin. |
+| `stars` | ~100,000 stars as an HR diagram | ~32 MB from the HYG catalogue. Colour index against absolute magnitude, both axes standardized because they are in unrelated units. One broad diagonal band — the main sequence — with the giant branch as a spur off the top. Wants `--limit 40000 --densify 2 --face-size 0.20 --face-fill 0.72`. |
+| `quakes` | ~25,000 earthquakes of M2.5+ over a year | ~4 MB from USGS, paged because one query is capped at 20,000. A beautiful map and a poor mosaic — see below. |
 
 Layouts (`--layout`), for the datasets that need one:
 
@@ -210,7 +213,31 @@ each group inward until it nearly touches its neighbours, closing that space to 
 untouched, but it does change where they sit relative to one another — a choice for
 the artwork, not a claim about the data. Off by default.
 
+## Making thin data paintable
+
+`--densify 3` simulates two extra points near every real one until the scatter can
+carry a picture. It is kernel density estimation run backwards — sampling from the
+KDE rather than evaluating it — with one refinement that matters: the bandwidth is
+per point, set to the distance to that point's own sixth neighbour. A fixed
+bandwidth blurs tight structure while barely filling sparse ground; a local one
+moves a dot in a dense clump only a little and a dot on a fringe more, so the
+outline stays where it was.
+
+The world-cities example is the clearest case: at 34,000 points the avatars are
+faint smudges, and at 102,000 they are legible.
+
+**These points are not data.** They are flagged in a `simulated` column, every other
+field is left blank for them, and nothing should be measured from them. The count in
+the page header includes them, so say so if you publish the number.
+
 ## Known limits
+
+**Filaments cannot hold a picture, densified or not.** `--dataset quakes` is the
+honest counter-example: a year of earthquakes draws the plate boundaries beautifully,
+but the arcs are one or two points wide, and at 4× density the faces still come out
+as smudges strung along a line with several regions holding nothing legible at all.
+Densifying a filament thickens it into a blur rather than making room. The tool needs
+ground with area, which is why `cities` works and `quakes` does not.
 
 Small source images stay soft when blown up to a large square; the painted style is
 less affected than the overlay, since it only samples colours.
@@ -227,7 +254,8 @@ Everything is fetched at run time and none of it is redistributed here.
 **Points.** MNIST, Fashion-MNIST and Kuzushiji-MNIST via OpenML; scikit-learn's
 digits and the Olivetti/AT&T face database; Labeled Faces in the Wild; Google's
 Cartoon Set (CC BY 4.0), read through the `cgarciae/cartoonset` mirror; the
-`cities15000` gazetteer from GeoNames (CC BY 4.0).
+`cities15000` gazetteer from GeoNames (CC BY 4.0); the USGS earthquake catalogue
+(public domain); and the HYG star database (CC BY-SA 2.5).
 
 **Pictures.** OpenMoji (CC BY-SA 4.0). SFHQ, which is generated rather than
 photographed. The anime portraits come from the `HK83/Anime_Faces` mirror of the
