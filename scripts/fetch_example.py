@@ -84,9 +84,9 @@ import sys  # noqa: E402
 
 sys.path.insert(0, str(ROOT))
 
-from umap_mosaic.cutout import apply_cutout, cut_out, pad_to_frame  # noqa: E402
-from umap_mosaic.density import densify  # noqa: E402
-from umap_mosaic.remote import RemoteFile  # noqa: E402
+from scatter_mosaic.cutout import apply_cutout, cut_out, pad_to_frame  # noqa: E402
+from scatter_mosaic.density import densify  # noqa: E402
+from scatter_mosaic.remote import RemoteFile  # noqa: E402
 
 DIGIT_NAMES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
 GARMENT_NAMES = ["t-shirt", "trouser", "pullover", "dress", "coat",
@@ -95,7 +95,7 @@ GARMENT_NAMES = ["t-shirt", "trouser", "pullover", "dress", "coat",
 KUZUSHIJI_NAMES = ["o", "ki", "su", "tsu", "na", "ha", "ma", "ya", "re", "wo"]
 LFW_HOME = Path.home() / "scikit_learn_data" / "lfw_home" / "lfw_funneled"
 
-GEONAMES_CITIES = "https://download.geonames.org/export/dump/cities15000.zip"
+GEONAMES_CITIES = "https://download.geonames.org/export/dump/cities5000.zip"
 USGS_QUERY = ("https://earthquake.usgs.gov/fdsnws/event/1/query?format=csv"
               "&starttime={start}&endtime={end}&minmagnitude=2.5&orderby=time")
 # One query may return at most 20,000 events, so a year has to be asked for in parts.
@@ -200,7 +200,7 @@ def cartoon(limit: int, pool: int) -> Source:
     """
     import pyarrow.parquet as pq
 
-    from umap_mosaic.remote import session
+    from scatter_mosaic.remote import session
 
     connection = session()
     frames, first, columns = [], None, None
@@ -320,7 +320,7 @@ def emoji_pictures(count: int, pool: int, seed: int) -> list[tuple[Image.Image, 
     the plain one — the grinning face rather than its fourteen cousins. Skin-tone
     variants and multi-codepoint sequences are dropped for the same reason.
     """
-    from umap_mosaic.remote import session
+    from scatter_mosaic.remote import session
 
     print("Reading the OpenMoji index...")
     connection = session()
@@ -375,13 +375,13 @@ def cities(limit: int) -> Source:
     import io as _io
     import zipfile
 
-    from umap_mosaic.remote import session
+    from scatter_mosaic.remote import session
 
     print("Fetching GeoNames cities15000 (~3 MB)...")
     answer = session().get(GEONAMES_CITIES, timeout=180)
     answer.raise_for_status()
     with zipfile.ZipFile(_io.BytesIO(answer.content)) as bundle:
-        with bundle.open("cities15000.txt") as handle:
+        with bundle.open("cities5000.txt") as handle:
             frame = pd.read_csv(handle, sep="\t", header=None, dtype=str,
                                 usecols=[1, 4, 5, 8, 14],
                                 names=["name", "lat", "lon", "country", "population"])
@@ -414,7 +414,7 @@ def quakes(limit: int) -> Source:
     """
     import io as _io
 
-    from umap_mosaic.remote import session
+    from scatter_mosaic.remote import session
 
     connection = session()
     parts = []
@@ -449,7 +449,7 @@ def stars(limit: int) -> Source:
     """
     import io as _io
 
-    from umap_mosaic.remote import session
+    from scatter_mosaic.remote import session
 
     print("Fetching the HYG star catalogue (~32 MB)...")
     answer = session().get(HYG_STARS, timeout=900)

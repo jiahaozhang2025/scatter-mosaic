@@ -1,6 +1,6 @@
 # Guide
 
-Everything the [README](../README.md) leaves out.
+Reference for Scatter Mosaic. The [README](../README.md) is the short version.
 
 - [Three independent choices](#three-independent-choices)
 - [Where each image goes](#where-each-image-goes)
@@ -33,7 +33,7 @@ hashed from each point's own index, so the viewer and the poster agree, every ru
 
 ## Where each image goes
 
-`umap_mosaic/placement.py` packs one equal square per image:
+`scatter_mosaic/placement.py` packs one equal square per image:
 
 1. Score every square position. `--face-fill` (0.85) is the share of the square the
    cloud covers, which rejects holes; `--face-density` (0.55) keeps an image off
@@ -90,7 +90,7 @@ behave the same way:
 ## Cutting images out
 
 Only meaningful for photographs of people. `--images-from faces` does it for you;
-this is the same code (`umap_mosaic/cutout.py`) pointed at a folder of your own:
+this is the same code (`scatter_mosaic/cutout.py`) pointed at a folder of your own:
 
 ```bash
 python scripts/extract_faces.py --input images --output images_cutout
@@ -154,7 +154,7 @@ Points (`--dataset`):
 | `lfw` | 13,233 photographs of 5,749 people | ~200 MB. Fair warning: a UMAP of raw pixels separates pose and lighting, not identity, so the map is close to one blob. |
 | `digits` | 1,797 digits, 8×8 | Bundled with scikit-learn, no download. |
 | `olivetti` | 400 faces, 40 people | ~4.5 MB. |
-| `cities` | ~34,000 cities over 15,000 people | ~3 MB from GeoNames. Not an embedding: longitude and latitude, `--layout` ignored. Wants `--densify 3 --face-size 0.13 --face-fill 0.45`, because continents are ragged and thin. |
+| `cities` | ~70,000 cities over 5,000 people | ~5 MB from GeoNames. Longitude and latitude, `--layout` ignored. Coastlines are ragged and thin, so this one wants many small pictures on plenty of points: `--densify 5 --tiles 30 --face-size 0.055 --face-fill 0.40`. |
 | `stars` | ~100,000 stars as an HR diagram | ~32 MB from the HYG catalogue. Colour index against absolute magnitude, both axes standardized because they are in unrelated units. One broad diagonal band — the main sequence — with the giant branch as a spur off the top. Wants `--limit 40000 --densify 2 --face-size 0.20 --face-fill 0.72`. |
 | `quakes` | ~25,000 earthquakes of M2.5+ over a year | ~4 MB from USGS, paged because one query is capped at 20,000. A beautiful map and a poor mosaic — see below. |
 
@@ -172,14 +172,14 @@ their tiles by average colour, so no two look alike from across the room.
 The cartoon example is the one worth reading the code for. Its embedding is of the
 *attributes*, not the pixels — a UMAP of cartoon pixels comes out as thin wisps,
 while the attributes give solid islands, and the attribute columns are one megabyte
-against the images' 488. And it never downloads that file: `umap_mosaic/remote.py`
+against the images' 488. And it never downloads that file: `scatter_mosaic/remote.py`
 turns a URL into something `pyarrow` can seek inside, so a 489 MB parquet is read one
 column and one row group at a time.
 
 ## Project layout
 
 ```
-umap_mosaic/        the library
+scatter_mosaic/        the library
   dataset.py        read any embedding CSV
   placement.py      pack equal squares, hand out regions
   painting.py       colour the dots from an image
@@ -231,6 +231,10 @@ field is left blank for them, and nothing should be measured from them. The coun
 the page header includes them, so say so if you publish the number.
 
 ## Known limits
+
+**Point count sets the page size**, at roughly 65 bytes a point in the HTML: 40,000
+points make a 1.8 MB page and 350,000 make a 20 MB one. The poster does not care.
+Densify with that in mind.
 
 **Filaments cannot hold a picture, densified or not.** `--dataset quakes` is the
 honest counter-example: a year of earthquakes draws the plate boundaries beautifully,

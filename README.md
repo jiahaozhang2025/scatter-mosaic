@@ -1,99 +1,94 @@
-# UMAP Photo Mosaic
+# Scatter Mosaic
 
-Turn any 2-D embedding into a mosaic of images made out of its own points.
+Paint pictures out of the points of a scatter plot.
 
-![A UMAP of 40,000 handwritten digits with ten emoji painted into it, and a zoomed detail showing that each dot is one digit](docs/hero.jpg)
+![A scatter of 40,000 handwritten digits with ten emoji painted into it, and a zoomed detail showing that each dot is one digit](docs/hero.jpg)
 
-Give it a CSV with two coordinate columns and a folder of pictures. It finds the
-places on the scatter that can hold an image, hands each one a square, and colours
-every point from the image nearest it — so the pictures are made of the data rather
-than pasted over it. You get one self-contained HTML file (pan, zoom, click a point)
-and a print-resolution poster.
+Give it a CSV with two coordinate columns and a folder of images. It finds the parts
+of the scatter dense enough to hold a picture, gives each image a square, and then
+colours every point from the image nearest it. Nothing is drawn on top: the picture
+is made of the data, and every dot, wisp and gap survives.
 
-## Quick start
+You get one self-contained HTML file — pan, zoom, click a point to see its values —
+and a poster at print resolution.
+
+## Install and run
 
 ```bash
 pip install -r requirements.txt
-
-python scripts/fetch_example.py --dataset mnist --images-from emoji   # ~20 MB
-python scripts/build_mosaic.py --embedding examples/mnist-emoji/embedding.csv \
-                               --images    examples/mnist-emoji/images \
-                               --out       examples/mnist-emoji/mosaic \
-                               --face-size 0.14 --face-fill 0.72
-python scripts/build_poster.py --regions   examples/mnist-emoji/mosaic/regions.csv \
-                               --images    examples/mnist-emoji/images
 ```
 
-Open `examples/mnist-emoji/mosaic/mosaic.html`. `fetch_example.py` always ends by
-printing the build command that suits the map it just made.
+Point it at your own data:
 
-## Nothing here is about UMAP
+```bash
+python scripts/build_mosaic.py --embedding your_data.csv --images your_pictures/ --out mosaic
+python scripts/build_poster.py --regions mosaic/regions.csv --images your_pictures/
+```
 
-Nothing downstream of the fetch script knows how the coordinates were made. It is a
-2-D scatter painter: `--dataset` says where the points come from, `--layout` how they
-were flattened, and `--images-from` where the pictures come from. All three are
-independent, and the last one is unrelated to your data by design — you have data,
-and you have pictures you want the data to be made of.
+Or build one of the bundled examples end to end, data and all:
 
-![Four mosaics on four different kinds of scatter: a UMAP of MNIST with emoji, a t-SNE of Fashion-MNIST with AI-generated faces, a Hertzsprung-Russell diagram of 40,000 stars with anime portraits, and world cities plotted by longitude and latitude with cartoon avatars](docs/pictures.jpg)
+```bash
+python scripts/fetch_example.py --dataset mnist --images-from emoji
+```
 
-Two of those are not projections of anything. The stars are a Hertzsprung–Russell
-diagram — colour against brightness, the oldest scatter plot in astronomy. The
-bottom row is cities at their real longitude and latitude. No algorithm, no
-clusters, and the placement rules do not change: Europe and India are dense enough
-to hold an image, the Pacific is not.
+Every fetch prints the exact build command that suits the map it just made.
 
-### Thin data: `--densify`
+## Your data
 
-Real scatters are often too sparse to paint with. `--densify 3` simulates two extra
-points near every real one — sampled from the scatter's own shape, with the jitter
-scaled by each point's distance to its own sixth neighbour, so dense ground stays
-tight and the outline holds. The world map above is unreadable without it and
-legible with it.
-
-The added points are **not data**. They are flagged in a `simulated` column, left
-blank in every other field, and nothing should be measured from them.
-
-| `--images-from` | | |
-|---|---|---|
-| `emoji` | One from each Unicode group, via OpenMoji | Ships its own alpha, and its real names reach the legend. |
-| `faces` | AI-generated portraits from SFHQ | **The one that gets cut out** — GrabCut against a head-and-shoulders trimap. Synthetic on purpose: a generated face is nobody. |
-| `cartoon` | Avatars from Google's Cartoon Set | Ships its own alpha. |
-| `anime` | Anime portraits | No alpha to be had, and GrabCut takes the face and throws the hair away, so these are feathered instead. |
-
-`--dataset` takes `mnist`, `fashion`, `kmnist`, `cartoon`, `lfw`, `digits`,
-`olivetti`, and the three that need no layout at all — `cities`, `stars` and
-`quakes`. `--layout` takes `umap` (default), `tsne` and `pca`. Leave `--images-from`
-off and each dataset illustrates itself, one image per class.
-
-## Your own data
-
-Two coordinate columns is the only requirement. Everything else is optional:
+Two coordinate columns is the only requirement:
 
 ```csv
 id,x,y,label,score
 cell-0,3.71,-8.20,neuron,0.94
 ```
 
-Coordinates are guessed from the usual names (`x`/`y`, `UMAP1`/`UMAP2`, `tsne_1`,
-`PC1`, …); any other column is carried through and shown when you click a point.
-Nothing checks, or cares, whether an algorithm produced them.
-Pictures come from a folder, one per region, matched through an `image_map.csv`
-you can edit and rebuild from.
+- **Coordinates** are guessed from the usual names — `x`/`y`, `UMAP1`/`UMAP2`,
+  `tsne_1`, `PC1`, `dim1` — or named with `--x-column` / `--y-column`. It does not
+  matter what produced them, or whether anything did.
+- **Every other column** rides along and appears when you click a point.
+- **Pictures** come from a folder, one per region. The assignment is written to
+  `image_map.csv`; edit it and rebuild to move a picture somewhere else.
+- **Sparse data** can be thickened with `--densify 3`, which simulates points from
+  the shape the scatter already has. Simulated points are flagged and are not data.
+
+## What it looks like on different data
+
+![Four mosaics on four kinds of scatter: a UMAP of MNIST with emoji, a t-SNE of Fashion-MNIST with AI-generated faces, a Hertzsprung-Russell diagram of stars with anime portraits, and world cities plotted by longitude and latitude with thirty emoji](docs/pictures.jpg)
+
+The bundled examples exist to be copied from. Pick where the points come from, how
+they are laid out, and what the pictures are — the three are independent:
+
+| | |
+|---|---|
+| **`--dataset`** | `mnist`, `fashion`, `kmnist`, `cartoon`, `lfw`, `digits`, `olivetti` — or `cities`, `stars` and `quakes`, which have real coordinates and need no layout at all. |
+| **`--layout`** | `umap` (default), `tsne`, `pca`. |
+| **`--images-from`** | `emoji`, `faces`, `cartoon`, `anime`. Leave it off and each dataset illustrates itself, one image per class. |
+
+Photographs of people need their backgrounds removed first, or the picture gets
+painted onto the wall behind the subject. `scripts/extract_faces.py` does that with
+GrabCut, and `--images-from faces` shows it working on synthetic portraits.
+
+## Two ways to draw it
+
+**Painted dots** colours each point from the image, so the picture is made of the
+scatter. **Image overlay** lays the picture over the dots instead. Both live inside
+the page, along with a light/dark switch, an image-amount slider and a dot-size
+slider — so you choose after building, not before.
 
 ## More
 
-**[docs/GUIDE.md](docs/GUIDE.md)** covers the rest: how placement decides where each
-image goes and which knobs to turn when it looks wrong, the two drawing styles, the
-in-page controls, the colour system, cutting your own photographs out, and the
-project layout. There is a runnable version in
-[notebooks/walkthrough.ipynb](notebooks/walkthrough.ipynb).
+**[docs/GUIDE.md](docs/GUIDE.md)** — how placement decides where a picture goes and
+what to change when it looks wrong, the colour system, cutting photographs out,
+densifying thin data, and the limits.
+**[notebooks/walkthrough.ipynb](notebooks/walkthrough.ipynb)** does the same thing
+one cell at a time.
 
 ## License
 
-MIT. No datasets are redistributed here — everything is fetched at run time, and
-`examples/` is ignored by git. Provenance for each source is in
-[the guide](docs/GUIDE.md#credits).
+MIT. No datasets are redistributed here; the examples fetch what they need at run
+time and `examples/` is ignored by git. Sources and their licences are listed
+[in the guide](docs/GUIDE.md#credits).
 
-If you publish a mosaic built from photographs of identifiable people, get their
-consent first. That is why the bundled portrait example is synthetic.
+If you build a mosaic from photographs of identifiable people, get their consent
+before publishing it. The bundled portrait example uses generated faces for exactly
+this reason.

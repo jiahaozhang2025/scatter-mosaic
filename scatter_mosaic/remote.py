@@ -21,7 +21,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-USER_AGENT = "umap-photo-mosaic/1.0"
+USER_AGENT = "scatter-mosaic/1.0"
 
 
 def session(retries: int = 6) -> requests.Session:

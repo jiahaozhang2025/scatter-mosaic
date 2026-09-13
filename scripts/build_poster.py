@@ -11,13 +11,13 @@ import pandas as pd
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from umap_mosaic import images as img  # noqa: E402
-from umap_mosaic.dataset import dataset_name, load_embedding  # noqa: E402
-from umap_mosaic.layout import normalize_isotropic  # noqa: E402
-from umap_mosaic.painting import blend_with_region, paint_patches, paint_spots  # noqa: E402
-from umap_mosaic.placement import allocate_faces  # noqa: E402
-from umap_mosaic.silhouette import make_masks, mask_bbox, morph_into_mask  # noqa: E402
-from umap_mosaic.theme import THEMES, color_for, theme_rgb, use_theme  # noqa: E402
+from scatter_mosaic import images as img  # noqa: E402
+from scatter_mosaic.dataset import dataset_name, load_embedding  # noqa: E402
+from scatter_mosaic.layout import normalize_isotropic  # noqa: E402
+from scatter_mosaic.painting import blend_with_region, paint_patches, paint_spots  # noqa: E402
+from scatter_mosaic.placement import allocate_faces  # noqa: E402
+from scatter_mosaic.silhouette import make_masks, mask_bbox, morph_into_mask  # noqa: E402
+from scatter_mosaic.theme import THEMES, color_for, theme_rgb, use_theme  # noqa: E402
 
 
 def arguments() -> argparse.Namespace:

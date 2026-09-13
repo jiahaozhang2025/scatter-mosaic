@@ -15,13 +15,13 @@ from PIL import Image, ImageFilter
 from sklearn.cluster import KMeans
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from umap_mosaic import images as img  # noqa: E402
-from umap_mosaic.dataset import dataset_name, load_embedding  # noqa: E402
-from umap_mosaic.layout import compact_clusters, normalize_isotropic  # noqa: E402
-from umap_mosaic.painting import paint_patches, paint_spots, quantize_per_region  # noqa: E402
-from umap_mosaic.placement import allocate_faces, assign_regions  # noqa: E402
-from umap_mosaic.silhouette import make_masks, mask_bbox, morph_into_mask  # noqa: E402
-from umap_mosaic.theme import THEMES, color_for, use_theme  # noqa: E402
+from scatter_mosaic import images as img  # noqa: E402
+from scatter_mosaic.dataset import dataset_name, load_embedding  # noqa: E402
+from scatter_mosaic.layout import compact_clusters, normalize_isotropic  # noqa: E402
+from scatter_mosaic.painting import paint_patches, paint_spots, quantize_per_region  # noqa: E402
+from scatter_mosaic.placement import allocate_faces, assign_regions  # noqa: E402
+from scatter_mosaic.silhouette import make_masks, mask_bbox, morph_into_mask  # noqa: E402
+from scatter_mosaic.theme import THEMES, color_for, use_theme  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -325,7 +325,7 @@ def main() -> None:
         "paint": {"index": paint_index, "palettes": palettes},
     }
 
-    template = (ROOT / "umap_mosaic" / "template.html").read_text(encoding="utf-8")
+    template = (ROOT / "scatter_mosaic" / "template.html").read_text(encoding="utf-8")
     html = template.replace("__MOSAIC_DATA__", json.dumps(payload, separators=(",", ":"), ensure_ascii=False))
     if html == template:
         raise SystemExit("Template is missing the __MOSAIC_DATA__ placeholder")

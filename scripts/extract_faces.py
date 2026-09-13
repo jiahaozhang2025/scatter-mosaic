@@ -28,9 +28,9 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from umap_mosaic import images as img  # noqa: E402
-from umap_mosaic.cutout import apply_cutout, checkerboard, cut_out  # noqa: E402
-from umap_mosaic.theme import THEMES, use_theme  # noqa: E402
+from scatter_mosaic import images as img  # noqa: E402
+from scatter_mosaic.cutout import apply_cutout, checkerboard, cut_out  # noqa: E402
+from scatter_mosaic.theme import THEMES, use_theme  # noqa: E402
 
 
 def arguments() -> argparse.Namespace:
